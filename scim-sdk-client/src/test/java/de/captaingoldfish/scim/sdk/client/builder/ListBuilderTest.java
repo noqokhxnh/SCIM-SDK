@@ -11,8 +11,6 @@ import java.util.stream.Stream;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +37,7 @@ import de.captaingoldfish.scim.sdk.server.filter.antlr.FilterRuleErrorListener;
 import de.captaingoldfish.scim.sdk.server.filter.antlr.ScimFilterLexer;
 import de.captaingoldfish.scim.sdk.server.filter.antlr.ScimFilterParser;
 import de.captaingoldfish.scim.sdk.server.utils.RequestUtils;
+import lombok.extern.slf4j.Slf4j;
 
 
 /**
@@ -46,6 +45,7 @@ import de.captaingoldfish.scim.sdk.server.utils.RequestUtils;
  * created at: 16.12.2019 - 14:11 <br>
  * <br>
  */
+@Slf4j
 public class ListBuilderTest extends HttpServerMockup
 {
 
@@ -418,6 +418,9 @@ public class ListBuilderTest extends HttpServerMockup
               "4946,50,false", "4500,500,false"})
   public void testSendListGetAllRequest(Long startIndex, Integer count, boolean useGet)
   {
+    System.out.println("USER COUNT BEFORE LIST TEST: "
+                       + ((UserHandler)scimConfig.getUserResourceType().getResourceHandlerImpl()).getInMemoryMap()
+                                                                                                 .size());
     final String sortBy = "username";
     final SortOrder sortOrder = SortOrder.DESCENDING;
     final String[] attributes = new String[]{"username", "meta.created"};
@@ -441,11 +444,14 @@ public class ListBuilderTest extends HttpServerMockup
     ListResponse<User> listResponse = response.getResource();
     Assertions.assertEquals(Optional.ofNullable(startIndex).filter(i -> i > 0).orElse(1L),
                             listResponse.getStartIndex());
-
     if (count == null || count + Optional.ofNullable(startIndex).orElse(1L) >= listResponse.getTotalResults())
     {
-      Assertions.assertEquals(allUserCount - Optional.ofNullable(startIndex).map(i -> i - 1).orElse(0L),
-                              listResponse.getListedResources().size());
+      long availableResources = allUserCount
+                                - Optional.ofNullable(startIndex).filter(i -> i > 0).map(i -> i - 1).orElse(0L);
+
+      long expectedResources = count == null ? availableResources : Math.min(count, availableResources);
+
+      Assertions.assertEquals(expectedResources, listResponse.getListedResources().size());
     }
     else if (listResponse.getTotalResults() - Optional.ofNullable(startIndex).orElse(1L) > count)
     {
@@ -507,8 +513,12 @@ public class ListBuilderTest extends HttpServerMockup
 
     if (count == null || count + Optional.ofNullable(startIndex).orElse(1L) >= listResponse.getTotalResults())
     {
-      Assertions.assertEquals(allUserCount - Optional.ofNullable(startIndex).map(i -> i - 1).orElse(0L),
-                              listResponse.getListedResources().size());
+      long availableResources = allUserCount
+                                - Optional.ofNullable(startIndex).filter(i -> i > 0).map(i -> i - 1).orElse(0L);
+
+      long expectedResources = count == null ? availableResources : Math.min(count, availableResources);
+
+      Assertions.assertEquals(expectedResources, listResponse.getListedResources().size());
     }
     else if (listResponse.getTotalResults() - Optional.ofNullable(startIndex).orElse(1L) > count)
     {
